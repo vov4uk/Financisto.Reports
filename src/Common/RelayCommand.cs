@@ -10,7 +10,7 @@ namespace fcrd
         private readonly Predicate<object> _canExecute;
 
         public RelayCommand(Action<object> execute)
-          : this(execute, (Predicate<object>)null)
+          : this(execute, null)
         {
         }
 

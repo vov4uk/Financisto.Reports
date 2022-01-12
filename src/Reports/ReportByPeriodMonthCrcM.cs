@@ -12,7 +12,7 @@ namespace fcrd
         [DisplayName("Месяц")]
         public long Month { get; protected set; }
 
-        public string PeriodDesr => string.Format("{0} {1}", (object)this.Month, (object)this.Year);
+        public string PeriodDesr => string.Format("{0} {1}", Month, Year);
 
         [Field("credit_sum")]
         [DisplayName("Приход")]

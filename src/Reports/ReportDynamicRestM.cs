@@ -16,7 +16,7 @@ namespace fcrd
         [Field("day")]
         public long Day { get; protected set; }
 
-        public string Title => string.Format("{0}.{1}.{2}", (object)this.Day, (object)this.Month, (object)this.Year);
+        public string Title => string.Format("{0}.{1}.{2}", this.Day, this.Month, this.Year);
 
         [DisplayName("Всего в домашней валюте")]
         [Field("total")]

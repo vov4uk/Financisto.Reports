@@ -8,10 +8,13 @@ namespace fcrd
 {
     internal class ReportsControlVM : BaseViewModel
     {
+        private RelayCommand _closeReportCommand;
+        private RelayCommand _openReportCommand;
         private ObservableCollection<object> _reportsVM;
         private object _selectedReport;
-        private RelayCommand _openReportCommand;
-        private RelayCommand _closeReportCommand;
+        public ICommand CloseReportCommand => this._closeReportCommand ?? (this._closeReportCommand = new RelayCommand(p => this.CloseReport()));
+
+        public ICommand OpenReportCommand => this._openReportCommand ?? (this._openReportCommand = new RelayCommand(p => this.OpenReport((string)p)));
 
         public ObservableCollection<ReportNode> ReportsInfo
         {
@@ -84,11 +87,15 @@ namespace fcrd
             }
         }
 
-        public ICommand OpenReportCommand => (ICommand)(this._openReportCommand ?? (this._openReportCommand = new RelayCommand((Action<object>)(p => this.OpenReport((string)p)))));
+        public void CloseReport()
+        {
+            this.ReportsVM.Remove(this.SelectedReport);
+            this.SelectedReport = this.ReportsVM.FirstOrDefault();
+        }
 
         public void OpenReport(string reportType)
         {
-            object obj1 = this.ReportsVM.Where<object>((Func<object, bool>)(p => p.GetType().ToString() == reportType)).FirstOrDefault<object>();
+            object obj1 = this.ReportsVM.Where(p => p.GetType().ToString() == reportType).FirstOrDefault();
             if (obj1 != null)
             {
                 this.SelectedReport = obj1;
@@ -96,27 +103,19 @@ namespace fcrd
             else
             {
                 Type type = Type.GetType(reportType, false, true);
-                if (type != (Type)null)
+                if (type != null)
                 {
                     ConstructorInfo constructor = type.GetConstructor(new Type[0]);
-                    if (constructor != (ConstructorInfo)null)
+                    if (constructor != null)
                     {
                         object obj2 = constructor.Invoke(new object[0]);
-                        HeaderAttribute customAttribute = (HeaderAttribute)Attribute.GetCustomAttribute((MemberInfo)type, typeof(HeaderAttribute));
-                        obj2.GetType().GetProperty("Header").SetValue(obj2, (object)customAttribute.Header, (object[])null);
+                        HeaderAttribute customAttribute = (HeaderAttribute)Attribute.GetCustomAttribute(type, typeof(HeaderAttribute));
+                        obj2.GetType().GetProperty("Header").SetValue(obj2, customAttribute.Header, null);
                         this.ReportsVM.Add(obj2);
                         this.SelectedReport = obj2;
                     }
                 }
             }
-        }
-
-        public ICommand CloseReportCommand => (ICommand)(this._closeReportCommand ?? (this._closeReportCommand = new RelayCommand((Action<object>)(p => this.CloseReport()))));
-
-        public void CloseReport()
-        {
-            this.ReportsVM.Remove(this.SelectedReport);
-            this.SelectedReport = this.ReportsVM.FirstOrDefault<object>();
         }
     }
 }

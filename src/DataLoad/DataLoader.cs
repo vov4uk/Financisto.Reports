@@ -29,7 +29,7 @@ namespace fcrd
 
         private void DataReaderOnEntityRead(string type, Dictionary<string, string> items)
         {
-            TableInfo tableInfo = DB.TablesInfo.FirstOrDefault<TableInfo>((Func<TableInfo, bool>)(p => p.TableName == type));
+            TableInfo tableInfo = DB.TablesInfo.FirstOrDefault(p => p.TableName == type);
             if (tableInfo == null)
                 return;
             StringBuilder stringBuilder1 = new StringBuilder(string.Format("INSERT INTO [{0}] (", (object)type));
@@ -39,7 +39,7 @@ namespace fcrd
                 while (enumerator.MoveNext())
                 {
                     KeyValuePair<string, string> item = enumerator.Current;
-                    ColumnInfo columnInfo = tableInfo.ColumnsInfo.FirstOrDefault<ColumnInfo>((Func<ColumnInfo, bool>)(p => p.ColName == item.Key));
+                    ColumnInfo columnInfo = tableInfo.ColumnsInfo.FirstOrDefault(p => p.ColName == item.Key);
                     if (columnInfo != null)
                     {
                         StringBuilder stringBuilder3 = stringBuilder1;
@@ -67,11 +67,11 @@ namespace fcrd
                         StringBuilder stringBuilder4 = stringBuilder2;
                         keyValuePair = item;
                         string key4 = keyValuePair.Key;
-                        keyValuePair = items.First<KeyValuePair<string, string>>();
+                        keyValuePair = items.First();
                         string key5 = keyValuePair.Key;
                         string format2 = key4 == key5 ? "'{0}' " : ",'{0}' ";
                         string str2 = str1;
-                        stringBuilder4.AppendFormat(format2, (object)str2);
+                        stringBuilder4.AppendFormat(format2, str2);
                     }
                 }
             }
@@ -82,10 +82,75 @@ namespace fcrd
 
         private void PrepareData()
         {
-            DB.ExecuteNonQuery("\r\n                                    update currency_exchange_rate \r\n                                    set rate_date = date( rate_date);\r\n\r\n                                    update currency_exchange_rate \r\n                                    set rate_date_end =  (select min (rate_date) from currency_exchange_rate x \r\n                                                         where x.from_currency_id = currency_exchange_rate.from_currency_id \r\n                                                             and x.to_currency_id = currency_exchange_rate.to_currency_id\r\n                                                             and x.rate_date > currency_exchange_rate.rate_date ) \r\n                                    ;  \r\n\r\n                                    update currency_exchange_rate \r\n                                    set rate_date_end = '9999-12-31'\r\n                                    where rate_date_end is null;\r\n                                ");
-            DB.ExecuteNonQuery("\r\n                                    /* ид валют счетов проводки */\r\n                                    update transactions\r\n                                    set from_account_crc_id = (select currency_id from account acc where acc._id = from_account_id );\r\n\r\n                                    update transactions\r\n                                    set to_account_crc_id = (select currency_id from account acc where acc._id = to_account_id );\r\n                                    \r\n                                    /* сума проводки в домашней валюте*/\r\n                                    update transactions\r\n                                    set from_amount_default_crr =\r\n                                            case (select _id from currency where is_default = 1)\r\n                                                when from_account_crc_id then from_amount\r\n                                                else round(from_amount * ( select rate from currency_exchange_rate \r\n                                                        where to_currency_id = (select _id from currency where is_default = 1) \r\n                                                            and from_currency_id =  from_account_crc_id\r\n                                                            and datetime between rate_date and rate_date_end ) , 0 )\r\n                                            end;\r\n        \r\n                                    update transactions\r\n                                    set to_amount_default_crr =\r\n                                            case (select _id from currency where is_default = 1)\r\n                                                when to_account_crc_id then to_amount\r\n                                                else round(to_amount * ( select rate from currency_exchange_rate \r\n                                                        where to_currency_id = (select _id from currency where is_default = 1) \r\n                                                            and from_currency_id =  to_account_crc_id\r\n                                                            and datetime between rate_date and rate_date_end ) , 0 )\r\n                                            end;   \r\n\r\n                                     /* дата проводки по частям */\r\n                                    update transactions\r\n                                    set \r\n                                        date_year = strftime('%Y', datetime),\r\n                                        date_month = strftime('%m', datetime),\r\n                                        date_day = strftime('%d', datetime),\r\n                                        date_week = strftime('%W', datetime), \r\n                                        date_weekday = strftime('%w', datetime);\r\n                                ");
-            DB.ExecuteNonQuery("\r\n                                   update account\r\n                                    set total_amount_indef =\r\n                                            case (select _id from currency where is_default = 1)\r\n                                                when currency_id then total_amount\r\n                                                else round(total_amount * ( select rate from currency_exchange_rate \r\n                                                        where to_currency_id = (select _id from currency where is_default = 1) \r\n                                                            and from_currency_id =  currency_id\r\n                                                            and rate_date_end = '9999-12-31' ) , 0 )\r\n                                            end; \r\n                                ");
-            DB.ExecuteNonQuery("\r\n                                   update account\r\n                                    set total_amount_indef =\r\n                                            case (select _id from currency where is_default = 1)\r\n                                                when currency_id then total_amount\r\n                                                else round(total_amount * ( select rate from currency_exchange_rate \r\n                                                        where to_currency_id = (select _id from currency where is_default = 1) \r\n                                                            and from_currency_id =  currency_id\r\n                                                            and rate_date_end = '9999-12-31' ) , 0 )\r\n                                            end; \r\n                                ");
+            DB.ExecuteNonQuery(@"
+UPDATE currency_exchange_rate
+SET    rate_date = DATE(rate_date);
+
+UPDATE currency_exchange_rate
+SET    rate_date_end = (SELECT Min (rate_date)
+                        FROM   currency_exchange_rate x
+                        WHERE  x.from_currency_id = currency_exchange_rate.from_currency_id
+                               AND x.to_currency_id = currency_exchange_rate.to_currency_id
+                               AND x.rate_date > currency_exchange_rate.rate_date);
+
+UPDATE currency_exchange_rate
+SET    rate_date_end = '9999-12-31'
+WHERE  rate_date_end IS NULL; 
+"
+);
+            DB.ExecuteNonQuery(@"
+/* ид валют счетов проводки */
+UPDATE transactions
+SET    from_account_crc_id = (SELECT currency_id
+                              FROM   account acc
+                              WHERE  acc._id = from_account_id);
+
+UPDATE transactions
+SET    to_account_crc_id = (SELECT currency_id
+                            FROM   account acc
+                            WHERE  acc._id = to_account_id);
+
+/* сума проводки в домашней валюте*/
+UPDATE transactions
+SET    from_amount_default_crr =
+        CASE (SELECT _id FROM currency WHERE is_default = 1)
+        WHEN from_account_crc_id THEN from_amount
+        ELSE Round( from_amount * (SELECT rate
+                             FROM   currency_exchange_rate
+                             WHERE  to_currency_id = (SELECT _id FROM currency WHERE is_default = 1)
+                                    AND from_currency_id = from_account_crc_id
+                                    AND datetime BETWEEN rate_date AND rate_date_end), 0 )
+                             END;
+
+UPDATE transactions
+SET    to_amount_default_crr = CASE (SELECT _id FROM currency WHERE is_default = 1)
+                                 WHEN to_account_crc_id THEN to_amount
+                                 ELSE Round(to_amount * (SELECT rate FROM currency_exchange_rate
+                                                         WHERE to_currency_id = (SELECT _id FROM currency WHERE is_default = 1)
+                                                         AND from_currency_id = to_account_crc_id
+                                                         AND datetime BETWEEN rate_date AND rate_date_end), 0)
+                                 END;
+
+/* дата проводки по частям */
+UPDATE transactions
+SET    date_year = Strftime('%Y', datetime),
+       date_month = Strftime('%m', datetime),
+       date_day = Strftime('%d', datetime),
+       date_week = Strftime('%W', datetime),
+       date_weekday = Strftime('%w', datetime); 
+");
+
+            DB.ExecuteNonQuery(@"
+UPDATE account
+SET    total_amount_indef = CASE (SELECT _id FROM currency WHERE is_default = 1 )
+                              WHEN currency_id THEN total_amount
+                              ELSE Round(total_amount * (SELECT rate
+                                                         FROM currency_exchange_rate
+                                                         WHERE to_currency_id = (SELECT _id FROM currency WHERE is_default = 1 )
+                                         AND from_currency_id = currency_id
+                                         AND rate_date_end = '9999-12-31'), 0)
+                            END; 
+");
         }
 
         public static DateTime UnixTimeStampToDateTime(double unixTimeStamp) => new DateTime(1970, 1, 1, 0, 0, 0, 0).AddSeconds(unixTimeStamp).ToLocalTime();
